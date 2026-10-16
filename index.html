@@ -285,11 +285,7 @@
       if (uRaw.includes("TAMBOR") || det.includes("TAMBOR") || det.includes("208L")) return "TAMBOR";
       if (uRaw.includes("CARTUCHO") || det.includes("CARTUCHO")) return "CARTUCHO";
       if (uRaw.includes("GARRAFA") || det.includes("GARRAFA") || det.includes("5L") || det.includes("4L")) return "GARRAFA";
-      if (uRaw.includes("UNIDAD LITRO") || uRaw.includes("UND LITRO") || det.includes("1L") || det.includes("UNIDAD LITRO")) return "UNIDAD LITRO";
-      if (uRaw.includes("UNIDAD GL") || uRaw.includes("UND GL") || det.includes("GALON") || det.includes("GALÓN") || det.includes("GL")) return "UNIDAD GL";
-      if (uRaw.includes("LITRO") || det.includes("LITRO") || det.includes("LTS")) return "LITROS";
 
-      return uRaw || "UNIDAD";
     }
 
     async function loadDataFromGoogleSheets() {
