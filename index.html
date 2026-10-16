@@ -85,11 +85,25 @@
 
     <!-- Filtros de Inventario -->
     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-      <div class="flex justify-between items-center mb-4">
-        <div class="flex items-center gap-2 text-slate-700 font-bold text-base">
-          <i class="fa-solid fa-filter text-indigo-600"></i>
-          <span>Filtros de Inventario</span>
+      <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 text-slate-700 font-bold text-base">
+            <i class="fa-solid fa-filter text-indigo-600"></i>
+            <span>Filtros de Inventario</span>
+          </div>
+
+          <!-- Botón de Activación B2B -->
+          <button 
+            id="btnB2B" 
+            onclick="toggleFiltroB2B()" 
+            class="ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shadow-sm"
+          >
+            <i class="fa-solid fa-[#fa-bolt] fa-bolt text-slate-400" id="b2bIcon"></i>
+            <span>Filtro B2B</span>
+            <span id="b2bBadge" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-slate-300 text-slate-700 font-extrabold">OFF</span>
+          </button>
         </div>
+
         <button onclick="clearFilters()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer">Limpiar Filtros</button>
       </div>
       
@@ -200,9 +214,21 @@
       "B2B PRINCIPAL"
     ]);
 
+    // Unidades de Medida B2B Permitidas
+    const UNIDADES_B2B_REQUERIDAS = [
+      "BALDE",
+      "TAMBOR",
+      "CARTUCHO",
+      "GARRAFA",
+      "LITROS",
+      "UNIDAD LITRO",
+      "UNIDAD GL"
+    ];
+
     let inventoryData = [];
     let barChartInst = null;
     let donutChartInst = null;
+    let isB2BActive = false;
 
     function escapeHTML(str) {
       return String(str).replace(/[&<>"']/g, function(m) {
@@ -216,7 +242,49 @@
       });
     }
 
-    // Identifica o deduce la unidad de medida según la API o el detalle del producto
+    // Alternar activar / desactivar Filtro B2B
+    function toggleFiltroB2B() {
+      isB2BActive = !isB2BActive;
+      const btn = document.getElementById('btnB2B');
+      const badge = document.getElementById('b2bBadge');
+      const icon = document.getElementById('b2bIcon');
+      const selectMarca = document.getElementById('selectMarca');
+      const selectUnidad = document.getElementById('selectUnidad');
+
+      if (isB2BActive) {
+        // Estilo Botón Activo
+        btn.className = "ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-indigo-500 bg-indigo-600 text-white shadow-md cursor-pointer";
+        badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-emerald-400 text-slate-900 font-extrabold";
+        badge.innerText = "ON";
+        icon.className = "fa-solid fa-bolt text-amber-300";
+
+        // Ajustar Marca a MOBIL si existe
+        if (Array.from(selectMarca.options).some(opt => opt.value === "MOBIL")) {
+          selectMarca.value = "MOBIL";
+        }
+
+        // Seleccionar automáticamente las 7 Unidades de Medida B2B
+        for (let i = 0; i < selectUnidad.options.length; i++) {
+          const optVal = selectUnidad.options[i].value;
+          selectUnidad.options[i].selected = UNIDADES_B2B_REQUERIDAS.includes(optVal);
+        }
+      } else {
+        // Estilo Botón Inactivo
+        btn.className = "ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shadow-sm";
+        badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-slate-300 text-slate-700 font-extrabold";
+        badge.innerText = "OFF";
+        icon.className = "fa-solid fa-bolt text-slate-400";
+
+        // Desseleccionar filtros automáticos B2B
+        selectMarca.value = "";
+        for (let i = 0; i < selectUnidad.options.length; i++) {
+          selectUnidad.options[i].selected = false;
+        }
+      }
+
+      applyFilters();
+    }
+
     function resolverUnidadMedida(item) {
       const uRaw = String(item["Unidad"] || item["UNIDAD"] || item["unidad"] || item["Und"] || item["UND"] || "").trim().toUpperCase();
       const det = String(item["Detalle"] || "").toUpperCase();
@@ -349,118 +417,3 @@
 
     function updateKPIs(data) {
       let totalUnits = 0;
-      const activeSedes = new Set();
-      const registeredBrands = new Set();
-
-      for (let i = 0; i < data.length; i++) {
-        totalUnits += data[i].cantidad;
-        if (data[i].sede) activeSedes.add(data[i].sede);
-        if (data[i].marca) registeredBrands.add(data[i].marca);
-      }
-
-      document.getElementById('kpiUnidades').innerText = totalUnits.toLocaleString();
-      document.getElementById('kpiRegistros').innerText = data.length.toLocaleString();
-      document.getElementById('kpiSedes').innerText = activeSedes.size;
-      document.getElementById('kpiMarcas').innerText = registeredBrands.size;
-    }
-
-    function renderTable(data) {
-      const tbody = document.getElementById('tableBody');
-
-      if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400">No se encontraron registros coincidentes.</td></tr>';
-        return;
-      }
-
-      let htmlContent = '';
-
-      for (let i = 0; i < data.length; i++) {
-        const item = data[i];
-        htmlContent += `
-          <tr class="hover:bg-slate-50 transition-colors">
-            <td class="px-4 py-3 font-semibold text-slate-700">${escapeHTML(item.ref)}</td>
-            <td class="px-4 py-3 font-medium text-slate-800">${escapeHTML(item.detalle)}</td>
-            <td class="px-4 py-3">
-              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">${escapeHTML(item.marca)}</span>
-            </td>
-            <td class="px-4 py-3 font-medium text-slate-500">${escapeHTML(item.unidad)}</td>
-            <td class="px-4 py-3 text-slate-600 font-medium">${escapeHTML(item.sede)}</td>
-            <td class="px-4 py-3 text-right font-bold text-slate-800">${item.cantidad.toLocaleString()}</td>
-          </tr>
-        `;
-      }
-
-      tbody.innerHTML = htmlContent;
-    }
-
-    function renderCharts(data) {
-      const sedeGroup = {};
-      const marcaGroup = {};
-
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        if (d.sede) sedeGroup[d.sede] = (sedeGroup[d.sede] || 0) + d.cantidad;
-        if (d.marca) marcaGroup[d.marca] = (marcaGroup[d.marca] || 0) + d.cantidad;
-      }
-
-      const ctxBar = document.getElementById('barChart').getContext('2d');
-      if (barChartInst) barChartInst.destroy();
-      barChartInst = new Chart(ctxBar, {
-        type: 'bar',
-        data: {
-          labels: Object.keys(sedeGroup),
-          datasets: [{
-            label: 'Unidades',
-            data: Object.values(sedeGroup),
-            backgroundColor: '#4f46e5',
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
-
-      const ctxDonut = document.getElementById('donutChart').getContext('2d');
-      if (donutChartInst) donutChartInst.destroy();
-      donutChartInst = new Chart(ctxDonut, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(marcaGroup),
-          datasets: [{
-            data: Object.values(marcaGroup),
-            backgroundColor: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b']
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
-        }
-      });
-    }
-
-    function clearFilters() {
-      document.getElementById('selectBodega').value = '';
-      document.getElementById('selectMarca').value = '';
-      
-      const selectUnidad = document.getElementById('selectUnidad');
-      for (let i = 0; i < selectUnidad.options.length; i++) {
-        selectUnidad.options[i].selected = false;
-      }
-
-      document.getElementById('searchInput').value = '';
-      applyFilters();
-    }
-
-    function refreshData() {
-      loadDataFromGoogleSheets();
-    }
-
-    document.addEventListener('DOMContentLoaded', loadDataFromGoogleSheets);
-  </script>
-</body>
-</html>
