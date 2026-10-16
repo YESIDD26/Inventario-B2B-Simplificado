@@ -107,8 +107,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Unidad de Medida (Múltiple)</label>
-          <select id="selectUnidad" multiple onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 h-[42px] overflow-y-auto">
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Unidad de Medida (Filtrar Múltiple)</label>
+          <select id="selectUnidad" multiple onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 h-[68px] overflow-y-auto">
             <option value="BALDE">BALDE</option>
             <option value="TAMBOR">TAMBOR</option>
             <option value="CARTUCHO">CARTUCHO</option>
@@ -117,7 +117,7 @@
             <option value="UNIDAD LITRO">UNIDAD LITRO</option>
             <option value="UNIDAD GL">UNIDAD GL</option>
           </select>
-          <span class="text-[10px] text-slate-400 mt-1 block">Mantén presionado Ctrl/Cmd para seleccionar varias</span>
+          <span class="text-[10px] text-slate-400 mt-1 block">Presiona Ctrl o Cmd para seleccionar una o varias</span>
         </div>
       </div>
     </div>
@@ -186,7 +186,7 @@
   </main>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbw_7Kqupkzb8O2vCKZOGYq6Cx2MKZ-Gd5HZA6YGlnu8zAVFOUhWL0pRg_6Dp6CWwhCq/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxb8hgWlxi3UYKM0VR4xmzZ3Z6Y4eq_wUWBoi9AES93ZFE2tYGYaPM0z-JZ47xkBoc6/exec";
     
     // Lista explícita de bodegas permitidas (Sedes)
     const BODEGAS_PERMITIDAS = new Set([
@@ -216,33 +216,20 @@
       });
     }
 
-    // Helper inteligente para deducir/normalizar la unidad desde la API o el Detalle
-    function inferirUnidad(rawItem) {
-      const posibleUnidad = String(
-        rawItem["Unidad"] || 
-        rawItem["UNIDAD"] || 
-        rawItem["unidad"] || 
-        rawItem["Und"] || 
-        rawItem["UND"] || 
-        ""
-      ).trim().toUpperCase();
+    // Identifica o deduce la unidad de medida según la API o el detalle del producto
+    function resolverUnidadMedida(item) {
+      const uRaw = String(item["Unidad"] || item["UNIDAD"] || item["unidad"] || item["Und"] || item["UND"] || "").trim().toUpperCase();
+      const det = String(item["Detalle"] || "").toUpperCase();
 
-      if (posibleUnidad && posibleUnidad !== "UNDEFINED") {
-        return posibleUnidad;
-      }
+      if (uRaw.includes("BALDE") || det.includes("BALDE")) return "BALDE";
+      if (uRaw.includes("TAMBOR") || det.includes("TAMBOR") || det.includes("208L")) return "TAMBOR";
+      if (uRaw.includes("CARTUCHO") || det.includes("CARTUCHO")) return "CARTUCHO";
+      if (uRaw.includes("GARRAFA") || det.includes("GARRAFA") || det.includes("5L") || det.includes("4L")) return "GARRAFA";
+      if (uRaw.includes("UNIDAD LITRO") || uRaw.includes("UND LITRO") || det.includes("1L") || det.includes("UNIDAD LITRO")) return "UNIDAD LITRO";
+      if (uRaw.includes("UNIDAD GL") || uRaw.includes("UND GL") || det.includes("GALON") || det.includes("GALÓN") || det.includes("GL")) return "UNIDAD GL";
+      if (uRaw.includes("LITRO") || det.includes("LITRO") || det.includes("LTS")) return "LITROS";
 
-      // Si Apps Script no envió la columna 'Unidad', la inferimos del nombre del producto
-      const detalle = String(rawItem["Detalle"] || "").toUpperCase();
-
-      if (detalle.includes("BALDE")) return "BALDE";
-      if (detalle.includes("TAMBOR") || detalle.includes("208L")) return "TAMBOR";
-      if (detalle.includes("CARTUCHO")) return "CARTUCHO";
-      if (detalle.includes("GARRAFA") || detalle.includes("5L") || detalle.includes("4L")) return "GARRAFA";
-      if (detalle.includes("UNIDAD LITRO") || detalle.includes("1L")) return "UNIDAD LITRO";
-      if (detalle.includes("UNIDAD GL") || detalle.includes("GALON") || detalle.includes("GALÓN") || detalle.includes("GL")) return "UNIDAD GL";
-      if (detalle.includes("LITRO") || detalle.includes("LTS")) return "LITROS";
-
-      return "OTRAS";
+      return uRaw || "UNIDAD";
     }
 
     async function loadDataFromGoogleSheets() {
@@ -278,16 +265,16 @@
               const ref = String(item["Referencia"] || item["Ref2"] || "000000");
               const detalle = String(item["Detalle"] || "");
               const marca = String(item["Marca"] || "OTRAS");
-              const unidadVal = inferirUnidad(item);
+              const unidad = resolverUnidadMedida(item);
 
               processed.push({
                 ref,
                 detalle,
                 marca,
-                unidad: unidadVal,
+                unidad,
                 sede: bodegaVal,
                 cantidad: isNaN(cant) ? 0 : cant,
-                searchIndex: `${ref} ${detalle} ${marca} ${unidadVal} ${bodegaVal}`.toLowerCase()
+                searchIndex: `${ref} ${detalle} ${marca} ${unidad} ${bodegaVal}`.toLowerCase()
               });
             }
           }
@@ -344,8 +331,11 @@
         if (selectedSede && item.sede !== selectedSede) continue;
         if (selectedMarca && item.marca !== selectedMarca) continue;
         
-        // Filtro de Selección Múltiple de Unidades
-        if (selectedUnidades.length > 0 && !selectedUnidades.some(u => item.unidad.toUpperCase().includes(u))) continue;
+        // Evaluación del Filtro Multi-Selección de Unidades
+        if (selectedUnidades.length > 0) {
+          const matchUnidad = selectedUnidades.some(u => item.unidad.toUpperCase() === u || item.unidad.toUpperCase().includes(u));
+          if (!matchUnidad) continue;
+        }
 
         if (searchTerm && !item.searchIndex.includes(searchTerm)) continue;
 
@@ -371,4 +361,106 @@
       document.getElementById('kpiUnidades').innerText = totalUnits.toLocaleString();
       document.getElementById('kpiRegistros').innerText = data.length.toLocaleString();
       document.getElementById('kpiSedes').innerText = activeSedes.size;
-      document
+      document.getElementById('kpiMarcas').innerText = registeredBrands.size;
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tableBody');
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400">No se encontraron registros coincidentes.</td></tr>';
+        return;
+      }
+
+      let htmlContent = '';
+
+      for (let i = 0; i < data.length; i++) {
+        const item = data[i];
+        htmlContent += `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-4 py-3 font-semibold text-slate-700">${escapeHTML(item.ref)}</td>
+            <td class="px-4 py-3 font-medium text-slate-800">${escapeHTML(item.detalle)}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">${escapeHTML(item.marca)}</span>
+            </td>
+            <td class="px-4 py-3 font-medium text-slate-500">${escapeHTML(item.unidad)}</td>
+            <td class="px-4 py-3 text-slate-600 font-medium">${escapeHTML(item.sede)}</td>
+            <td class="px-4 py-3 text-right font-bold text-slate-800">${item.cantidad.toLocaleString()}</td>
+          </tr>
+        `;
+      }
+
+      tbody.innerHTML = htmlContent;
+    }
+
+    function renderCharts(data) {
+      const sedeGroup = {};
+      const marcaGroup = {};
+
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        if (d.sede) sedeGroup[d.sede] = (sedeGroup[d.sede] || 0) + d.cantidad;
+        if (d.marca) marcaGroup[d.marca] = (marcaGroup[d.marca] || 0) + d.cantidad;
+      }
+
+      const ctxBar = document.getElementById('barChart').getContext('2d');
+      if (barChartInst) barChartInst.destroy();
+      barChartInst = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(sedeGroup),
+          datasets: [{
+            label: 'Unidades',
+            data: Object.values(sedeGroup),
+            backgroundColor: '#4f46e5',
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      const ctxDonut = document.getElementById('donutChart').getContext('2d');
+      if (donutChartInst) donutChartInst.destroy();
+      donutChartInst = new Chart(ctxDonut, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(marcaGroup),
+          datasets: [{
+            data: Object.values(marcaGroup),
+            backgroundColor: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+      });
+    }
+
+    function clearFilters() {
+      document.getElementById('selectBodega').value = '';
+      document.getElementById('selectMarca').value = '';
+      
+      const selectUnidad = document.getElementById('selectUnidad');
+      for (let i = 0; i < selectUnidad.options.length; i++) {
+        selectUnidad.options[i].selected = false;
+      }
+
+      document.getElementById('searchInput').value = '';
+      applyFilters();
+    }
+
+    function refreshData() {
+      loadDataFromGoogleSheets();
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDataFromGoogleSheets);
+  </script>
+</body>
+</html>
