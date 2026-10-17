@@ -426,3 +426,208 @@
       if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400">No se encontraron registros en las bodegas autorizadas.</td></tr>';
         return;
+      }
+
+      let htmlContent = '';
+
+      for (let i = 0; i < data.length; i++) {
+        const item = data[i];
+        htmlContent += `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-4 py-3 font-semibold text-slate-700">${escapeHTML(item.ref)}</td>
+            <td class="px-4 py-3 font-medium text-slate-800">${escapeHTML(item.detalle)}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">${escapeHTML(item.marca)}</span>
+            </td>
+            <td class="px-4 py-3 text-slate-600 font-medium">${escapeHTML(item.sede)}</td>
+            <td class="px-4 py-3 font-medium text-slate-500">${escapeHTML(item.unidad)}</td>
+            <td class="px-4 py-3 text-right font-bold text-slate-800">${item.cantidad.toLocaleString()}</td>
+          </tr>
+        `;
+      }
+
+      tbody.innerHTML = htmlContent;
+    }
+
+    function renderCharts(data) {
+      const sedeGroup = {};
+      const marcaGroup = {};
+
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        if (d.sede) sedeGroup[d.sede] = (sedeGroup[d.sede] || 0) + d.cantidad;
+        if (d.marca) marcaGroup[d.marca] = (marcaGroup[d.marca] || 0) + d.cantidad;
+      }
+
+      const ctxBar = document.getElementById('barChart').getContext('2d');
+      if (barChartInst) barChartInst.destroy();
+      barChartInst = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(sedeGroup),
+          datasets: [{
+            label: 'Unidades',
+            data: Object.values(sedeGroup),
+            backgroundColor: '#4f46e5',
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      const ctxDonut = document.getElementById('donutChart').getContext('2d');
+      if (donutChartInst) donutChartInst.destroy();
+      donutChartInst = new Chart(ctxDonut, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(marcaGroup),
+          datasets: [{
+            data: Object.values(marcaGroup),
+            backgroundColor: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+      });
+    }
+
+    // Exportación a PDF organizada por BODEGA / SEDE y ordenada por REFERENCIA de Menor a Mayor
+    function exportarPDF() {
+      if (!currentFilteredData || currentFilteredData.length === 0) {
+        alert("No hay información filtrada para exportar a PDF.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      // Agrupar datos por Bodega / Sede
+      const bodegasMap = {};
+      currentFilteredData.forEach(item => {
+        const bodega = item.sede || 'OTRAS';
+        if (!bodegasMap[bodega]) bodegasMap[bodega] = [];
+        bodegasMap[bodega].push(item);
+      });
+
+      const bodegasOrdenadas = Object.keys(bodegasMap).sort();
+
+      doc.setFillColor(42, 43, 114);
+      doc.rect(0, 0, 210, 22, 'F');
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(255, 255, 255);
+      doc.text("INVENTARIO B2B - DETALLE POR BODEGA", 14, 12);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(200, 210, 255);
+      doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 14, 18);
+
+      let startY = 28;
+
+      bodegasOrdenadas.forEach((bodega, index) => {
+        // Ordenar productos de la bodega por Referencia de MENOR a MAYOR
+        const productosBodega = bodegasMap[bodega].sort((a, b) => {
+          return a.ref.localeCompare(b.ref, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        const totalCantBodega = productosBodega.reduce((acc, curr) => acc + curr.cantidad, 0);
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(42, 43, 114);
+        doc.text(`BODEGA / SEDE: ${bodega.toUpperCase()} (${productosBodega.length} Regs. | ${totalCantBodega.toLocaleString()} Unids.)`, 14, startY);
+
+        const tableBody = productosBodega.map(p => {
+          return [
+            p.ref,
+            p.detalle,
+            p.marca,
+            p.unidad,
+            p.cantidad.toLocaleString()
+          ];
+        });
+
+        doc.autoTable({
+          startY: startY + 3,
+          head: [['Referencia', 'Detalle / Descripción', 'Marca', 'Unidad', 'Cantidad']],
+          body: tableBody,
+          theme: 'striped',
+          headStyles: {
+            fillColor: [79, 70, 229],
+            textColor: 255,
+            fontSize: 8,
+            fontStyle: 'bold'
+          },
+          bodyStyles: {
+            fontSize: 7.5,
+            textColor: [51, 65, 85]
+          },
+          columnStyles: {
+            0: { cellWidth: 28, fontStyle: 'bold' },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 32 },
+            3: { cellWidth: 25 },
+            4: { cellWidth: 22, halign: 'right', fontStyle: 'bold' }
+          },
+          margin: { left: 14, right: 14 }
+        });
+
+        startY = doc.lastAutoTable.finalY + 8;
+
+        if (startY > 270 && index < bodegasOrdenadas.length - 1) {
+          doc.addPage();
+          startY = 20;
+        }
+      });
+
+      const totalGlobalUnidades = currentFilteredData.reduce((acc, curr) => acc + curr.cantidad, 0);
+      if (startY > 260) {
+        doc.addPage();
+        startY = 20;
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, startY, 196, startY);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text(`TOTAL GENERAL INVENTARIO B2B: ${currentFilteredData.length.toLocaleString()} Registros | ${totalGlobalUnidades.toLocaleString()} Unidades Totales`, 14, startY + 6);
+
+      doc.save(`Inventario_B2B_por_Bodega_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    function clearFilters() {
+      isB2BActive = false;
+      const btn = document.getElementById('btnB2B');
+      const badge = document.getElementById('b2bBadge');
+      const icon = document.getElementById('b2bIcon');
+
+      btn.className = "ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shadow-sm";
+      badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-slate-300 text-slate-700 font-extrabold";
+      badge.innerText = "OFF";
+      icon.className = "fa-solid fa-bolt text-slate-400";
+
+      document.getElementById('selectBodega').value = '';
+      document.getElementById('selectMarca').value = '';
+      document.getElementById('searchInput').value = '';
+      applyFilters();
+    }
+
+    function refreshData() {
+      loadDataFromGoogleSheets();
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDataFromGoogleSheets);
+  </script>
+</body>
+</html>
