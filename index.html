@@ -220,6 +220,38 @@
     // Unidades válidas requeridas para el filtro SOLO B2B
     const UNIDADES_B2B = ["BALDE", "TAMBOR", "CARTUCHO", "GARRAFA"];
 
+    // Conjunto Oficial de Unidades de Medida válidas en la Columna G
+    const UNIDADES_OFICIALES = new Set([
+      "UND", "UNID", "UNIDADES", "GALON", "LITRO", "OCTAVOS", "CUARTO", "CUARTOS",
+      "PINTA", "GALONES", "PINTAS", "BALDE", "TAMBOR", "CARTUCHO", "GARRAFA",
+      "LITROS", "UNIDAD LITRO", "UNIDAD GL", "BDE", "SACHET", "CAJA"
+    ]);
+
+    // Mapa directo de respaldo por Referencia (para garantizar exactitud frente a datos especiales)
+    const MAPA_UNIDADES_REF = {
+      "600425": "GARRAFA",
+      "600466": "GARRAFA",
+      "600467": "GARRAFA",
+      "601172": "GARRAFA",
+      "601183": "GARRAFA",
+      "602679": "GALON",
+      "602679U": "GALON",
+      "602698": "CUARTO",
+      "602699": "GALON",
+      "602700": "TAMBOR",
+      "602779": "BALDE",
+      "601560": "TAMBOR",
+      "601325": "LITROS",
+      "601325U": "LITROS",
+      "601322": "LITRO",
+      "601323": "LITRO",
+      "601324": "LITRO",
+      "601250": "CUARTO",
+      "601253": "CUARTO",
+      "601254": "GALON",
+      "601255": "TAMBOR"
+    };
+
     let inventoryData = [];
     let currentFilteredData = [];
     let barChartInst = null;
@@ -238,50 +270,40 @@
       });
     }
 
-    // Mapa directo por Referencia para garantizar la Columna G del libro de Google Sheets
-    const MAPA_UNIDADES_REF = {
-      "601560": "TAMBOR",
-      "601325": "LITROS",
-      "601325U": "LITROS",
-      "601322": "LITRO",
-      "601323": "LITRO",
-      "601324": "LITRO",
-      "601250": "CUARTO",
-      "601253": "CUARTO",
-      "601254": "GALON",
-      "601255": "TAMBOR"
-    };
+    // Función segura para extraer fielmente la Unidad de Medida de la Columna G
+    function resolverUnidadMedida(item, rawRef) {
+      const refKey = String(rawRef || "").trim().toUpperCase();
 
-    // Función segura para resolver la Unidad de Medida comercial real
-    function resolverUnidadMedida(item, refClean) {
-      // 1. Si la referencia está mapeada directamente
-      if (MAPA_UNIDADES_REF[refClean]) {
-        return MAPA_UNIDADES_REF[refClean];
+      // 1. Verificación directa contra el mapa de referencias explícitas
+      if (MAPA_UNIDADES_REF[refKey]) {
+        return MAPA_UNIDADES_REF[refKey];
       }
 
-      const det = String(item["Detalle"] || item["DETALLE"] || "").toUpperCase();
-
-      // 2. Extraer desde la descripción si coincide con patrones estándar
-      if (det.includes("TAM 55G") || det.includes("TAMBOR") || det.includes("208L") || det.includes(" TAM ")) return "TAMBOR";
-      if (det.includes("CAJA *12L") || det.includes("LITROS") || det.includes("12QT")) return "LITROS";
-      if (det.includes("LITRO") || det.includes(" 1L")) return "LITRO";
-      if (det.includes("GALON") || det.includes("GALÓN") || det.includes(" 5L") || det.includes(" 4L")) return "GALON";
-      if (det.includes("BALDE") || det.includes("5G ")) return "BALDE";
-      if (det.includes("GARRAFA")) return "GARRAFA";
-      if (det.includes("CARTUCHO")) return "CARTUCHO";
-      if (det.includes("CUARTO") || det.includes("1000") || det.includes("2000")) return "CUARTO";
-
-      // 3. Verificar si el objeto trae la clave explícita (descartando si trajo por error el nombre de la Bodega)
+      // 2. Iterar por todas las propiedades enviadas en el JSON
       const bodegaActual = String(item["Bodega"] || item["CONS BODEG"] || "").trim().toUpperCase();
+      
       for (const k in item) {
-        const keyUpper = k.trim().toUpperCase();
-        if (keyUpper === "UNIDAD" || keyUpper === "UND" || keyUpper === "PRESENTACION" || keyUpper === "PRESENTACIÓN") {
-          const val = String(item[k] || "").trim().toUpperCase();
-          if (val && val !== bodegaActual) return val;
+        const valRaw = String(item[k] || "").trim().toUpperCase();
+        if (!valRaw) continue;
+
+        // Si el valor recibido pertenece a la lista oficial de Unidades y no es la Bodega
+        if (UNIDADES_OFICIALES.has(valRaw) && valRaw !== bodegaActual) {
+          return valRaw;
         }
       }
 
-      return "UNIDAD";
+      // 3. Extracción de contingencia mediante la descripción comercial si aplica
+      const det = String(item["Detalle"] || item["DETALLE"] || "").toUpperCase();
+      if (det.includes("GARRAFA") || det.includes("MOBILITH SHC") || det.includes("SHC 460 PAIL") || det.includes("M-SHC POLY")) return "GARRAFA";
+      if (det.includes("TAM 55G") || det.includes("TAMBOR") || det.includes("208L") || det.includes(" TAM ")) return "TAMBOR";
+      if (det.includes("GALON") || det.includes("GALÓN") || det.includes(" 5L") || det.includes(" 4L")) return "GALON";
+      if (det.includes("BALDE") || det.includes("5G ")) return "BALDE";
+      if (det.includes("CUARTO") || det.includes("1000") || det.includes("2000")) return "CUARTO";
+      if (det.includes("CAJA *12L") || det.includes("LITROS") || det.includes("12QT")) return "LITROS";
+      if (det.includes("LITRO") || det.includes(" 1L")) return "LITRO";
+
+      // 4. Si la Columna G se encuentra totalmente vacía en el libro de Google Sheets
+      return "Indefinida";
     }
 
     // Toggle para activar/desactivar el filtro SOLO B2B
