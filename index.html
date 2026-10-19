@@ -238,15 +238,16 @@
       });
     }
 
-    // Resuelve o deduce la presentación/unidad desde la Columna G o la descripción
+    // Resuelve o deduce la presentación/unidad desde la Columna G ("Unidad") o la descripción
     function resolverUnidadMedida(item) {
-      const uRaw = String(item["Unidad"] || item["UNIDAD"] || item["unidad"] || item["Und"] || item["UND"] || "").trim().toUpperCase();
-      const det = String(item["Detalle"] || "").toUpperCase();
+      const uRaw = String(item["Unidad"] || item["UNIDAD"] || item["unidad"] || item["Und"] || item["UND"] || item["Presentacion"] || item["PRESENTACION"] || "").trim().toUpperCase();
+      const det = String(item["Detalle"] || item["DETALLE"] || "").toUpperCase();
 
-      if (det.includes("BALDE") || uRaw.includes("BALDE")) return "BALDE";
-      if (det.includes("TAMBOR") || det.includes("208L") || uRaw.includes("TAMBOR")) return "TAMBOR";
-      if (det.includes("CARTUCHO") || uRaw.includes("CARTUCHO")) return "CARTUCHO";
-      if (det.includes("GARRAFA") || det.includes("5L") || det.includes("4L") || uRaw.includes("GARRAFA")) return "GARRAFA";
+      // Verificación directa del valor de la columna G o contenido en detalle
+      if (uRaw.includes("BALDE") || det.includes("BALDE")) return "BALDE";
+      if (uRaw.includes("TAMBOR") || uRaw.includes("TAM") || det.includes("TAMBOR") || det.includes(" TAM ") || det.includes(" TAM") || det.includes("208L") || det.includes("55G")) return "TAMBOR";
+      if (uRaw.includes("CARTUCHO") || det.includes("CARTUCHO")) return "CARTUCHO";
+      if (uRaw.includes("GARRAFA") || det.includes("GARRAFA") || det.includes("5L") || det.includes("4L")) return "GARRAFA";
 
       return uRaw || "UNIDAD";
     }
