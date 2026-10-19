@@ -89,105 +89,6 @@
           <button 
             id="btnB2B" 
             onclick="toggleFiltroB2B()" 
-            class="ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-Aquí tienes el código completo con las modificaciones solicitadas:
-
-1. **Eliminación de la Columna Unidad:** Se retiró tanto del encabezado de la tabla como del cuerpo (`renderTable`), ajustando el `colspan` de las filas informativas a `5`.
-2. **Nueva Lógica del Botón "SOLO B2B":** Se simplificó `applyFilters` y `toggleFiltroB2B`. Ahora, al activar el botón, filtra para conservar **únicamente las bodegas/sedes cuyo nombre comience con `"B2B"`** (`item.sede.toUpperCase().startsWith("B2B")`).
-3. **Exportación a PDF Intacta:** La función `exportarPDF` mantiene el orden de referencias numéricas de menor a mayor (`localeCompare` con opción `numeric: true`) y se actualizó la tabla dentro del PDF removiendo la columna de unidad.
-4. **Respuesta desde Google Sheets Intacta:** Se agregaron los mecanismos de llamada de fallback (`gsCallback` / JSONP) para garantizar la lectura directa desde la API de Google Apps Script sin requerir modificaciones en el libro ni en Apps Script.
-
-```html
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard de Inventario B2B Simplificado</title>
-  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-  <script src="[https://cdn.jsdelivr.net/npm/chart.js](https://cdn.jsdelivr.net/npm/chart.js)"></script>
-  <link href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)" rel="stylesheet">
-  
-  <script src="[https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js](https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js)"></script>
-  <script src="[https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js](https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js)"></script>
-
-  <style>
-    body { background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  </style>
-</head>
-<body class="min-h-screen text-slate-800 pb-12">
-
-  <header class="bg-[#2a2b72] text-white px-6 py-5 shadow-lg">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div class="flex items-center gap-3">
-        <div class="p-2.5 bg-indigo-500/20 rounded-xl">
-          <i class="fa-solid fa-cubes text-2xl text-indigo-300"></i>
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Dashboard de Inventario</h1>
-          <p class="text-xs text-indigo-200">Monitoreo y análisis en tiempo real desde Google Sheets</p>
-        </div>
-      </div>
-      
-      <button 
-        onclick="refreshData()" 
-        id="btnRefresh"
-        class="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-md hover:shadow-indigo-500/25 cursor-pointer disabled:cursor-not-allowed"
-      >
-        <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
-        <span id="btnText">Actualizar Datos</span>
-      </button>
-    </div>
-  </header>
-
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
-
-    <!-- KPIs -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
-        <div class="p-3.5 bg-indigo-50 text-indigo-600 rounded-xl"><i class="fa-solid fa-box text-xl"></i></div>
-        <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Unidades</span>
-          <span class="text-2xl font-extrabold text-slate-800" id="kpiUnidades">0</span>
-        </div>
-      </div>
-
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
-        <div class="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl"><i class="fa-solid fa-list-check text-xl"></i></div>
-        <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Registros</span>
-          <span class="text-2xl font-extrabold text-slate-800" id="kpiRegistros">0</span>
-        </div>
-      </div>
-
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
-        <div class="p-3.5 bg-amber-50 text-amber-600 rounded-xl"><i class="fa-solid fa-warehouse text-xl"></i></div>
-        <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Sedes Autorizadas</span>
-          <span class="text-2xl font-extrabold text-slate-800" id="kpiSedes">0</span>
-        </div>
-      </div>
-
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
-        <div class="p-3.5 bg-purple-50 text-purple-600 rounded-xl"><i class="fa-solid fa-tags text-xl"></i></div>
-        <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Marcas Registradas</span>
-          <span class="text-2xl font-extrabold text-slate-800" id="kpiMarcas">0</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filtros -->
-    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-      <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 text-slate-700 font-bold text-base">
-            <i class="fa-solid fa-filter text-indigo-600"></i>
-            <span>Filtros de Inventario</span>
-          </div>
-
-          <button 
-            id="btnB2B" 
-            onclick="toggleFiltroB2B()" 
             class="ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shadow-sm"
           >
             <i class="fa-solid fa-bolt text-slate-400" id="b2bIcon"></i>
@@ -245,7 +146,7 @@
       </div>
     </div>
 
-    <!-- Tabla de Detalle (Sin columna Unidad) -->
+    <!-- Tabla de Detalle -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-2 text-indigo-900 font-bold text-base">
@@ -272,7 +173,7 @@
               <th class="px-4 py-3">Referencia</th>
               <th class="px-4 py-3">Detalle / Descripción</th>
               <th class="px-4 py-3">Marca</th>
-              <th class="px-4 py-3">Sede / Bodega</th>
+              <th class="px-4 py-3">Sede</th>
               <th class="px-4 py-3 text-right">Cantidad</th>
             </tr>
           </thead>
@@ -288,11 +189,17 @@
   </main>
 
   <script>
-    const API_URL = "[https://script.google.com/macros/s/AKfycbw_7Kqupkzb8O2vCKZOGYq6Cx2MKZ-Gd5HZA6YGlnu8zAVFOUhWL0pRg_6Dp6CWwhCq/exec](https://script.google.com/macros/s/AKfycbw_7Kqupkzb8O2vCKZOGYq6Cx2MKZ-Gd5HZA6YGlnu8zAVFOUhWL0pRg_6Dp6CWwhCq/exec)";
+    const API_URL = "https://script.google.com/macros/s/AKfycbw_7Kqupkzb8O2vCKZOGYq6Cx2MKZ-Gd5HZA6YGlnu8zAVFOUhWL0pRg_6Dp6CWwhCq/exec";
     
     const BODEGAS_PERMITIDAS = new Set([
       "AGUACHICA", "B2B AGUACHICA", "VALLEDUPAR", "B2B VALLEDUPAR",
       "BARRANQUILLA", "B2B BARRANQUILLA", "BODEGA PRINCIPAL", "B2B PRINCIPAL"
+    ]);
+
+    const UNIDADES_OFICIALES = new Set([
+      "UND", "UNID", "UNIDADES", "GALON", "LITRO", "OCTAVOS", "CUARTO", "CUARTOS",
+      "PINTA", "GALONES", "PINTAS", "BALDE", "TAMBOR", "CARTUCHO", "GARRAFA",
+      "LITROS", "UNIDAD LITRO", "UNIDAD GL", "BDE", "SACHET", "CAJA"
     ]);
 
     let inventoryData = [];
@@ -307,6 +214,35 @@
           '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
         }[m];
       });
+    }
+
+    function esNombreBodega(val) {
+      if (!val) return false;
+      const v = val.toUpperCase().trim();
+      return BODEGAS_PERMITIDAS.has(v) || v.includes("BARRANQUILLA") || v.includes("VALLEDUPAR") || v.includes("AGUACHICA") || v.includes("PRINCIPAL");
+    }
+
+    function resolverUnidadMedida(item) {
+      for (const k in item) {
+        const valRaw = String(item[k] || "").trim().toUpperCase();
+        if (!valRaw || valRaw === "UNDEFINED" || valRaw === "0") continue;
+
+        if (UNIDADES_OFICIALES.has(valRaw) && !esNombreBodega(valRaw)) {
+          return valRaw;
+        }
+      }
+
+      const det = String(item["Detalle"] || item["DETALLE"] || "").toUpperCase();
+
+      if (det.includes("24 PINTAS") || det.includes("PINTA")) return "PINTAS";
+      if (det.includes("12QT") || det.includes("12 QT") || det.includes("CUARTO")) return "CUARTO";
+      if (det.includes("4 GL") || det.includes("4GAL") || det.includes("GALON") || det.includes("GALÓN")) return "GALON";
+      if (det.includes("BD") || det.includes("BALDE") || det.includes("PAIL") || det.includes("5G")) return "BALDE";
+      if (det.includes("TAMBOR") || det.includes("TAM 55G") || det.includes("208L")) return "TAMBOR";
+      if (det.includes("GARRAFA")) return "GARRAFA";
+      if (det.includes("LITRO") || det.includes("L/0.") || det.includes("LITROS")) return "LITRO";
+
+      return "Indefinida";
     }
 
     function toggleFiltroB2B() {
@@ -330,18 +266,328 @@
       applyFilters();
     }
 
-    function processRawData(rawData) {
+    async function loadDataFromGoogleSheets() {
       const icon = document.getElementById('refreshIcon');
       const btnRefresh = document.getElementById('btnRefresh');
       const btnText = document.getElementById('btnText');
       const tbody = document.getElementById('tableBody');
+      
+      if (icon) icon.classList.add('fa-spin');
+      if (btnRefresh) btnRefresh.disabled = true;
+      if (btnText) btnText.innerText = 'Cargando...';
 
-      if (Array.isArray(rawData)) {
-        const processed = [];
-        
-        for (let i = 0; i < rawData.length; i++) {
-          const item = rawData[i];
-          const bodegaVal = String(item["Bodega"] || item["CONS BODEG"] || "").trim();
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando datos desde Google Sheets...</td></tr>';
+      }
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "GET",
+          redirect: "follow",
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+
+        const rawData = await response.json();
+
+        if (Array.isArray(rawData)) {
+          const processed = [];
           
-          if (BODEGAS_PERMITIDAS.has(bodegaVal.toUpperCase())) {
-            const cant =
+          for (let i = 0; i < rawData.length; i++) {
+            const item = rawData[i];
+            const bodegaVal = String(item["Bodega"] || item["CONS BODEG"] || "").trim();
+            
+            if (BODEGAS_PERMITIDAS.has(bodegaVal.toUpperCase())) {
+              const cant = Number(item["Cantid"] !== undefined ? item["Cantid"] : (item["Cantidad"] || 0));
+              const ref = String(item["Referencia"] || item["Ref2"] || "000000").trim();
+              const detalle = String(item["Detalle"] || "");
+              const marca = String(item["Marca"] || "OTRAS").trim();
+
+              processed.push({
+                ref,
+                detalle,
+                marca,
+                sede: bodegaVal,
+                cantidad: isNaN(cant) ? 0 : cant,
+                searchIndex: `${ref} ${detalle} ${marca} ${bodegaVal}`.toLowerCase()
+              });
+            }
+          }
+
+          inventoryData = processed;
+          populateSelectOptions();
+          applyFilters();
+        } else {
+          throw new Error("Formato no compatible");
+        }
+      } catch (error) {
+        console.error("Error al obtener datos:", error);
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-red-500 font-semibold">No se pudo cargar la información. Revisa la consola para más detalles.</td></tr>';
+        }
+      } finally {
+        if (icon) icon.classList.remove('fa-spin');
+        if (btnRefresh) btnRefresh.disabled = false;
+        if (btnText) btnText.innerText = 'Actualizar Datos';
+      }
+    }
+
+    function populateSelectOptions() {
+      const sedes = new Set();
+      const marcas = new Set();
+
+      for (let i = 0; i < inventoryData.length; i++) {
+        if (inventoryData[i].sede) sedes.add(inventoryData[i].sede);
+        if (inventoryData[i].marca) marcas.add(inventoryData[i].marca);
+      }
+
+      const selectBodega = document.getElementById('selectBodega');
+      const selectMarca = document.getElementById('selectMarca');
+
+      selectBodega.innerHTML = '<option value="">Todas las Bodegas Autorizadas</option>' + 
+        Array.from(sedes).sort().map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+
+      selectMarca.innerHTML = '<option value="">Todas las Marcas</option>' + 
+        Array.from(marcas).sort().map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+    }
+
+    function applyFilters() {
+      const selectedSede = document.getElementById('selectBodega').value;
+      const selectedMarca = document.getElementById('selectMarca').value;
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+
+      const filtered = [];
+
+      for (let i = 0; i < inventoryData.length; i++) {
+        const item = inventoryData[i];
+
+        if (selectedSede && item.sede !== selectedSede) continue;
+        if (selectedMarca && item.marca !== selectedMarca) continue;
+
+        // Filtro SOLO B2B: Conserva las bodegas cuyo nombre inicia con B2B
+        if (isB2BActive) {
+          if (!item.sede.toUpperCase().startsWith("B2B")) continue;
+        }
+
+        if (searchTerm && !item.searchIndex.includes(searchTerm)) continue;
+
+        filtered.push(item);
+      }
+
+      currentFilteredData = filtered;
+      updateKPIs(filtered);
+      renderTable(filtered);
+      renderCharts(filtered);
+    }
+
+    function updateKPIs(data) {
+      let totalUnits = 0;
+      const activeSedes = new Set();
+      const registeredBrands = new Set();
+
+      for (let i = 0; i < data.length; i++) {
+        totalUnits += data[i].cantidad;
+        if (data[i].sede) activeSedes.add(data[i].sede);
+        if (data[i].marca) registeredBrands.add(data[i].marca);
+      }
+
+      document.getElementById('kpiUnidades').innerText = totalUnits.toLocaleString();
+      document.getElementById('kpiRegistros').innerText = data.length.toLocaleString();
+      document.getElementById('kpiSedes').innerText = activeSedes.size;
+      document.getElementById('kpiMarcas').innerText = registeredBrands.size;
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tableBody');
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400">No se encontraron registros en las bodegas autorizadas.</td></tr>';
+        return;
+      }
+
+      let htmlContent = '';
+
+      for (let i = 0; i < data.length; i++) {
+        const item = data[i];
+        htmlContent += `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-4 py-3 font-semibold text-slate-700">${escapeHTML(item.ref)}</td>
+            <td class="px-4 py-3 font-medium text-slate-800">${escapeHTML(item.detalle)}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">${escapeHTML(item.marca)}</span>
+            </td>
+            <td class="px-4 py-3 text-slate-600 font-medium">${escapeHTML(item.sede)}</td>
+            <td class="px-4 py-3 text-right font-bold text-slate-800">${item.cantidad.toLocaleString()}</td>
+          </tr>
+        `;
+      }
+
+      tbody.innerHTML = htmlContent;
+    }
+
+    function renderCharts(data) {
+      const sedeGroup = {};
+      const marcaGroup = {};
+
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        if (d.sede) sedeGroup[d.sede] = (sedeGroup[d.sede] || 0) + d.cantidad;
+        if (d.marca) marcaGroup[d.marca] = (marcaGroup[d.marca] || 0) + d.cantidad;
+      }
+
+      const ctxBar = document.getElementById('barChart').getContext('2d');
+      if (barChartInst) barChartInst.destroy();
+      barChartInst = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(sedeGroup),
+          datasets: [{
+            label: 'Unidades',
+            data: Object.values(sedeGroup),
+            backgroundColor: '#4f46e5',
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      const ctxDonut = document.getElementById('donutChart').getContext('2d');
+      if (donutChartInst) donutChartInst.destroy();
+      donutChartInst = new Chart(ctxDonut, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(marcaGroup),
+          datasets: [{
+            data: Object.values(marcaGroup),
+            backgroundColor: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+      });
+    }
+
+    function exportarPDF() {
+      if (!currentFilteredData || currentFilteredData.length === 0) {
+        alert("No hay información filtrada para exportar a PDF.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      const bodegasMap = {};
+      currentFilteredData.forEach(item => {
+        const bodega = item.sede || 'OTRAS';
+        if (!bodegasMap[bodega]) bodegasMap[bodega] = [];
+        bodegasMap[bodega].push(item);
+      });
+
+      const bodegasOrdenadas = Object.keys(bodegasMap).sort();
+
+      doc.setFillColor(42, 43, 114);
+      doc.rect(0, 0, 210, 22, 'F');
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(255, 255, 255);
+      doc.text("INVENTARIO B2B - DETALLE POR BODEGA", 14, 12);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(200, 210, 255);
+      doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 14, 18);
+
+      let startY = 28;
+
+      bodegasOrdenadas.forEach((bodega, index) => {
+        // Ordenamiento numérico estricto de menor a mayor según la referencia
+        const productosBodega = bodegasMap[bodega].sort((a, b) => {
+          return a.ref.localeCompare(b.ref, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        const totalCantBodega = productosBodega.reduce((acc, curr) => acc + curr.cantidad, 0);
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(42, 43, 114);
+        doc.text(`BODEGA / SEDE: ${bodega.toUpperCase()} (${productosBodega.length} Regs. | ${totalCantBodega.toLocaleString()} Unids.)`, 14, startY);
+
+        const tableBody = productosBodega.map(p => {
+          return [p.ref, p.detalle, p.marca, p.cantidad.toLocaleString()];
+        });
+
+        doc.autoTable({
+          startY: startY + 3,
+          head: [['Referencia', 'Detalle / Descripción', 'Marca', 'Cantidad']],
+          body: tableBody,
+          theme: 'striped',
+          headStyles: { fillColor: [79, 70, 229], textColor: 255, fontSize: 8, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
+          columnStyles: {
+            0: { cellWidth: 28, fontStyle: 'bold' },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+          },
+          margin: { left: 14, right: 14 }
+        });
+
+        startY = doc.lastAutoTable.finalY + 8;
+
+        if (startY > 270 && index < bodegasOrdenadas.length - 1) {
+          doc.addPage();
+          startY = 20;
+        }
+      });
+
+      const totalGlobalUnidades = currentFilteredData.reduce((acc, curr) => acc + curr.cantidad, 0);
+      if (startY > 260) {
+        doc.addPage();
+        startY = 20;
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, startY, 196, startY);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text(`TOTAL GENERAL INVENTARIO B2B: ${currentFilteredData.length.toLocaleString()} Registros | ${totalGlobalUnidades.toLocaleString()} Unidades Totales`, 14, startY + 6);
+
+      doc.save(`Inventario_B2B_por_Bodega_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    function clearFilters() {
+      isB2BActive = false;
+      const btn = document.getElementById('btnB2B');
+      const badge = document.getElementById('b2bBadge');
+      const icon = document.getElementById('b2bIcon');
+
+      btn.className = "ml-2 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shadow-sm";
+      badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-slate-300 text-slate-700 font-extrabold";
+      badge.innerText = "OFF";
+      icon.className = "fa-solid fa-bolt text-slate-400";
+
+      document.getElementById('selectBodega').value = '';
+      document.getElementById('selectMarca').value = '';
+      document.getElementById('searchInput').value = '';
+      applyFilters();
+    }
+
+    function refreshData() {
+      loadDataFromGoogleSheets();
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDataFromGoogleSheets);
+  </script>
+</body>
+</html>
