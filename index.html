@@ -199,6 +199,12 @@
 
     const UNIDADES_B2B = ["BALDE", "TAMBOR", "CARTUCHO", "GARRAFA"];
 
+    const UNIDADES_OFICIALES = new Set([
+      "UND", "UNID", "UNIDADES", "GALON", "LITRO", "OCTAVOS", "CUARTO", "CUARTOS",
+      "PINTA", "GALONES", "PINTAS", "BALDE", "TAMBOR", "CARTUCHO", "GARRAFA",
+      "LITROS", "UNIDAD LITRO", "UNIDAD GL", "BDE", "SACHET", "CAJA"
+    ]);
+
     let inventoryData = [];
     let currentFilteredData = [];
     let barChartInst = null;
@@ -213,31 +219,37 @@
       });
     }
 
-    // Solución puramente Frontend: Lee directamente el valor de la Columna G (índice 6)
+    // Valida si un texto corresponde a un nombre de Bodega/Sede
+    function esNombreBodega(val) {
+      if (!val) return false;
+      const v = val.toUpperCase().trim();
+      return BODEGAS_PERMITIDAS.has(v) || v.includes("BARRANQUILLA") || v.includes("VALLEDUPAR") || v.includes("AGUACHICA") || v.includes("PRINCIPAL");
+    }
+
+    // Resuelve estrictamente la Unidad de Medida excluyendo nombres de Bodega
     function resolverUnidadMedida(item) {
-      const keys = Object.keys(item);
-      const bodegaActual = String(item["Bodega"] || item["CONS BODEG"] || "").trim().toUpperCase();
+      // 1. Buscar entre las propiedades enviadas en el JSON
+      for (const k in item) {
+        const valRaw = String(item[k] || "").trim().toUpperCase();
+        if (!valRaw || valRaw === "UNDEFINED" || valRaw === "0") continue;
 
-      // 1. Acceso directo por posición de la Columna G (7ª propiedad -> índice 6)
-      if (keys.length >= 7) {
-        const valColG = String(item[keys[6]] || "").trim().toUpperCase();
-        if (valColG && valColG !== bodegaActual && valColG !== "UNDEFINED" && valColG !== "0") {
-          return valColG;
+        // Si es una unidad oficial y NO es un nombre de bodega
+        if (UNIDADES_OFICIALES.has(valRaw) && !esNombreBodega(valRaw)) {
+          return valRaw;
         }
       }
 
-      // 2. Búsqueda por coincidencias de nombre de propiedad
-      for (const k of keys) {
-        const keyUpper = k.trim().toUpperCase();
-        if (keyUpper === "UNIDAD" || keyUpper === "UND" || keyUpper === "PRESENTACION") {
-          const val = String(item[k] || "").trim().toUpperCase();
-          if (val && val !== bodegaActual && val !== "UNDEFINED") {
-            return val;
-          }
-        }
-      }
+      // 2. Si no se encontró un valor directo válido, deducir desde el Detalle
+      const det = String(item["Detalle"] || item["DETALLE"] || "").toUpperCase();
 
-      // 3. Si la Columna G se encuentra totalmente vacía en Google Sheets
+      if (det.includes("24 PINTAS") || det.includes("PINTA")) return "PINTAS";
+      if (det.includes("12QT") || det.includes("12 QT") || det.includes("CUARTO")) return "CUARTO";
+      if (det.includes("4 GL") || det.includes("4GAL") || det.includes("GALON") || det.includes("GALÓN")) return "GALON";
+      if (det.includes("BD") || det.includes("BALDE") || det.includes("PAIL") || det.includes("5G")) return "BALDE";
+      if (det.includes("TAMBOR") || det.includes("TAM 55G") || det.includes("208L")) return "TAMBOR";
+      if (det.includes("GARRAFA")) return "GARRAFA";
+      if (det.includes("LITRO") || det.includes("L/0.") || det.includes("LITROS")) return "LITRO";
+
       return "Indefinida";
     }
 
