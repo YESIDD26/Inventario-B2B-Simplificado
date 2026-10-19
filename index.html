@@ -238,26 +238,27 @@
       });
     }
 
-    // Retorna fielmente el valor de la Columna G ("Unidad") del libro de Google Sheets
+    // Extrae de forma estricta el valor exacto de la Columna G ("Unidad")
     function resolverUnidadMedida(item) {
-      const keys = Object.keys(item);
-      let valorColumnaG = "";
-
-      // Intentar obtener el valor mediante nombres de columna comunes de la API JSON
-      for (const k of keys) {
-        const keyUpper = k.trim().toUpperCase();
-        if (keyUpper === "UNIDAD" || keyUpper === "UND" || keyUpper === "PRESENTACION" || keyUpper === "PRESENTACIÓN") {
-          valorColumnaG = String(item[k] || "").trim();
-          break;
+      // 1. Lectura por coincidencia exacta de la clave de Columna G
+      for (const k in item) {
+        const cleanKey = k.trim().toUpperCase();
+        if (cleanKey === "UNIDAD" || cleanKey === "UND" || cleanKey === "PRESENTACION" || cleanKey === "PRESENTACIÓN") {
+          const val = String(item[k] || "").trim();
+          if (val) return val.toUpperCase();
         }
       }
 
-      // Si las claves son genéricas (p. ej. por posición de columna G -> 7ª propiedad)
-      if (!valorColumnaG && keys.length >= 7) {
-        valorColumnaG = String(item[keys[6]] || "").trim();
+      // 2. Si las claves son por índice ordinal, la Columna G es el índice 6
+      const keys = Object.keys(item);
+      if (keys.length >= 7) {
+        const valColG = String(item[keys[6]] || "").trim();
+        if (valColG && valColG.toUpperCase() !== String(item["Bodega"] || "").trim().toUpperCase()) {
+          return valColG.toUpperCase();
+        }
       }
 
-      return valorColumnaG ? valorColumnaG.toUpperCase() : "UNIDAD";
+      return "UNIDAD";
     }
 
     // Toggle para activar/desactivar el filtro SOLO B2B
